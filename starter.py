@@ -3,9 +3,9 @@ import glob
 import os
 import pickle
 import sys
-
 import numpy
 import tensorflow as tf
+import re
 
 
 def GetInputFiles():
@@ -20,7 +20,10 @@ VOCABULARY = collections.Counter()
 # ** TASK 1.
 def Tokenize(comment):
     """Receives a string (comment) and returns array of tokens."""
-    words = comment.split()
+    # words = comment.split()
+    words = comment.lower()
+    words = re.findall(r"[\w']+", words)
+    words = [word for word in words if len(words) > 1]
     return words
 
 
