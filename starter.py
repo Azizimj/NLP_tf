@@ -78,31 +78,37 @@ def FirstLayer(net, l2_reg_val, is_training):
     # net = tf.nn.relu(net)
 
     ### ME
-    # batch_size, number_of_vocabulary_tokens = net.shape
-    # l2_reg = tf.contrib.layers.l2_regularizer(l2_reg_val)
-    # net = tf.nn.l2_normalize(net, axis=0)  # ME Preprocess the layer input
+    batch_size, number_of_vocabulary_tokens = net.shape
+    l2_reg = tf.contrib.layers.l2_regularizer(l2_reg_val)
+    net = tf.nn.l2_normalize(net, axis=0)  # ME Preprocess the layer input
 
     ## tf layers
-    # # net = tf.contrib.layers.fully_connected(
-    # #     net, 40, activation_fn=None, weights_regularizer=l2_reg)
-    # net = tf.contrib.layers.fully_connected(net, 40, activation_fn=None,
-    #                                         weights_regularizer=None, normalizer_fn=tf.contrib.layers.batch_norm, scope="fc1")  # ME If normalizer_fn is given no bias is added
-    # # net = tf.nn.relu(net)  #ME
-    # net = tf.nn.tanh(net)  # ME
-    # # net = tf.contrib.layers.batch_norm(net,  is_training=is_training) # ME had to add it in to remove bias
-    #
+    net = tf.contrib.layers.fully_connected(net, 40, activation_fn=None,
+                                            weights_regularizer=None, normalizer_fn=tf.contrib.layers.batch_norm, scope="fc1")  # ME If normalizer_fn is given no bias is added
+    net = tf.nn.tanh(net)  # ME
+    # net = tf.contrib.layers.batch_norm(net,  is_training=is_training) # ME had to add it in to remove bias
     # tf.losses.add_loss(l2_reg_val*tf.math.square(tf.norm(net*net)), loss_collection=tf.GraphKeys.REGULARIZATION_LOSSES) # Y=?
 
     ## from scratch
-    weights = tf.Variable(tf.truncated_normal([number_of_vocabulary_tokens._value, 40]))
-    net_in = tf.matmul(net, weights)
-    net = tf.nn.tanh(net_in)
-    net = tf.contrib.layers.batch_norm(net, is_training=is_training)
-    reg_loss_ = l2_reg_val * tf.reduce_sum(net_in**2)
-    tf.losses.add_loss(reg_loss_, loss_collection=tf.GraphKeys.REGULARIZATION_LOSSES)
+    # weights = tf.Variable(tf.truncated_normal([number_of_vocabulary_tokens._value, 40]),name="w_fc1")
+    # net_in = tf.matmul(net, weights)
+    # net = tf.nn.tanh(net_in)
+    # net = tf.contrib.layers.batch_norm(net, is_training=is_training)
+    # reg_loss_ = l2_reg_val * tf.nn.l2_loss(net_in)
+    # tf.losses.add_loss(reg_loss_, loss_collection=tf.GraphKeys.REGULARIZATION_LOSSES)
 
     return net
 
+def l2_weighted_regularizer_(scale, x, scope=None):
+  def l2_we(weights):
+    """Applies l2 regularization to weights."""
+    with ops.name_scope(scope, 'l2_regularizer', [weights]) as name:
+      my_scale = ops.convert_to_tensor(scale,
+                                       dtype=weights.dtype.base_dtype,
+                                       name='scale')
+      return standard_ops.multiply(my_scale, nn.l2_loss(weights*), name=name)
+
+  return l2_we
 
 # ** TASK 2 ** BONUS part 1
 def EmbeddingL2RegularizationUpdate(embedding_variable, net_input, learn_rate, l2_reg_val):
