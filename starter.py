@@ -6,6 +6,7 @@ import sys
 import numpy
 import tensorflow as tf
 import re
+import string
 
 
 def GetInputFiles():
@@ -20,11 +21,42 @@ VOCABULARY = collections.Counter()
 # ** TASK 1.
 def Tokenize(comment):
     """Receives a string (comment) and returns array of tokens."""
+
     # words = comment.split()
-    words = comment.lower()
-    words = re.findall(r"[\w']+", words)
-    words = [word for word in words if len(words) > 1]
-    return words
+    # words = comment.lower()
+    # words = words.translate(str.maketrans('', '', string.digits))
+    # words = words.translate(str.maketrans('', '', string.punctuation))
+    # words = re.findall(r"[\w']+", words)
+    # words = [word for word in words if (len(word) > 1)]  #8.75
+
+    # words = comment.lower()
+    # # words = words.translate(str.maketrans('', '', string.digits))
+    # # words = words.translate(str.maketrans('', '', string.punctuation))
+    # # words = re.split('; |, |\' |\*|\n | |\.', words)
+    # # words = re.findall(r"[\w']+", words)
+    # #
+    # regex = re.compile('[^a-zA-Z]')
+    # words = regex.sub(' ', words).split()
+    # # words = re.sub("[^\w]", " ", words).split()
+    # #
+    # # words = [word.split("\\'") for word in words if (len(word) > 1)
+    # # & (word not in string.digits) & (word not in string.punctuation)]
+    # stop_words =[]
+    # if True:
+    #     stop_words = open("StopWords.txt", "r").read()
+    #     stop_words = re.split("\W+", stop_words)
+    # words = [word for word in words if (word not in stop_words) & (len(word) > 1)]
+
+    words = comment.split()
+    words_ = []
+    regex = re.compile('[^a-zA-Z]')
+    for word in words:
+        tmp = regex.sub(' ', word.lower()).split()
+        for word_ in tmp:
+            if len(word_) > 1:
+                words_.append(word_)
+
+    return words_
 
 
 # ** TASK 2.
@@ -39,10 +71,35 @@ def FirstLayer(net, l2_reg_val, is_training):
     Returns:
       2D tensor (batch-size, 40), where 40 is the hidden dimensionality.
     """
-    l2_reg = tf.contrib.layers.l2_regularizer(l2_reg_val)
-    net = tf.contrib.layers.fully_connected(
-        net, 40, activation_fn=None, weights_regularizer=l2_reg)
-    net = tf.nn.relu(net)
+    # Intact
+    # l2_reg = tf.contrib.layers.l2_regularizer(l2_reg_val)
+    # net = tf.contrib.layers.fully_connected(
+    #   net, 40, activation_fn=None, weights_regularizer=l2_reg)
+    # net = tf.nn.relu(net)
+
+    ### ME
+    # batch_size, number_of_vocabulary_tokens = net.shape
+    # l2_reg = tf.contrib.layers.l2_regularizer(l2_reg_val)
+    # net = tf.nn.l2_normalize(net, axis=0)  # ME Preprocess the layer input
+
+    ## tf layers
+    # # net = tf.contrib.layers.fully_connected(
+    # #     net, 40, activation_fn=None, weights_regularizer=l2_reg)
+    # net = tf.contrib.layers.fully_connected(net, 40, activation_fn=None,
+    #                                         weights_regularizer=None, normalizer_fn=tf.contrib.layers.batch_norm, scope="fc1")  # ME If normalizer_fn is given no bias is added
+    # # net = tf.nn.relu(net)  #ME
+    # net = tf.nn.tanh(net)  # ME
+    # # net = tf.contrib.layers.batch_norm(net,  is_training=is_training) # ME had to add it in to remove bias
+    #
+    # tf.losses.add_loss(l2_reg_val*tf.math.square(tf.norm(net*net)), loss_collection=tf.GraphKeys.REGULARIZATION_LOSSES) # Y=?
+
+    ## from scratch
+    weights = tf.Variable(tf.truncated_normal([number_of_vocabulary_tokens._value, 40]))
+    net_in = tf.matmul(net, weights)
+    net = tf.nn.tanh(net_in)
+    net = tf.contrib.layers.batch_norm(net, is_training=is_training)
+    reg_loss_ = l2_reg_val * tf.reduce_sum(net_in**2)
+    tf.losses.add_loss(reg_loss_, loss_collection=tf.GraphKeys.REGULARIZATION_LOSSES)
 
     return net
 
