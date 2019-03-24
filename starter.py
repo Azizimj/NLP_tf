@@ -58,8 +58,13 @@ def Tokenize(comment):
 
     return words_
 
+def l2_weighted_regularizer_(scale, net_):
+  def l2_we(weights):
+    return scale*tf.nn.l2_loss(tf.matmul(net_, weights))
+  return l2_we
 
 # ** TASK 2.
+# def FirstLayer(net, l2_reg_val, is_training):
 def FirstLayer(net, l2_reg_val, is_training):
     """First layer of the neural network.
 
@@ -71,26 +76,37 @@ def FirstLayer(net, l2_reg_val, is_training):
     Returns:
       2D tensor (batch-size, 40), where 40 is the hidden dimensionality.
     """
+
+    # batch_size, number_of_vocabulary_tokens = net.shape
+    # # net_example = tf.multinomial(tf.log([[400., 1.]]), number_of_vocabulary_tokens)
+    # # net_example = tf.constant(numpy.random.binomial(1, .1, (3,number_of_vocabulary_tokens)), dtype='int32')
+    # net_example = tf.placeholder(tf.float32, [None, number_of_vocabulary_tokens], name='x_example')
+    # var_ = tf.Variable(tf.truncated_normal([number_of_vocabulary_tokens._value, 40]), name="w_fc1")
+    # tmp = EmbeddingL2RegularizationUpdate(var_, net_example, .001, l2_reg_val)
+
     # Intact
     # l2_reg = tf.contrib.layers.l2_regularizer(l2_reg_val)
     # net = tf.contrib.layers.fully_connected(
     #   net, 40, activation_fn=None, weights_regularizer=l2_reg)
     # net = tf.nn.relu(net)
 
-    ### ME
-    batch_size, number_of_vocabulary_tokens = net.shape
-    l2_reg = tf.contrib.layers.l2_regularizer(l2_reg_val)
-    net = tf.nn.l2_normalize(net, axis=0)  # ME Preprocess the layer input
 
-    ## tf layers
-    net = tf.contrib.layers.fully_connected(net, 40, activation_fn=None,
-                                            weights_regularizer=None, normalizer_fn=tf.contrib.layers.batch_norm, scope="fc1")  # ME If normalizer_fn is given no bias is added
+    ### ME
+    net = tf.nn.l2_normalize(net, axis=0)  # ME Preprocess the layer input
+    # net = tf.contrib.layers.fully_connected(net, 40, activation_fn=tf.nn.tanh,
+    #                                         weights_regularizer=l2_weighted_regularizer_(scale=l2_reg_val, net_=net),
+    #                                         normalizer_fn=tf.contrib.layers.batch_norm, scope="fc1")  # ME If normalizer_fn is given no bias is added
+    net = tf.layers.dense(net, units=40, activation=None, use_bias=False,
+                          kernel_regularizer=l2_weighted_regularizer_(scale=l2_reg_val, net_=net), name="fc1")
     net = tf.nn.tanh(net)  # ME
-    # net = tf.contrib.layers.batch_norm(net,  is_training=is_training) # ME had to add it in to remove bias
+    net = tf.contrib.layers.batch_norm(net,  is_training=is_training) # ME had to add it in to remove bias
     # tf.losses.add_loss(l2_reg_val*tf.math.square(tf.norm(net*net)), loss_collection=tf.GraphKeys.REGULARIZATION_LOSSES) # Y=?
 
+
     ## from scratch
-    # weights = tf.Variable(tf.truncated_normal([number_of_vocabulary_tokens._value, 40]),name="w_fc1")
+    # batch_size, number_of_vocabulary_tokens = net.shape
+    # net = tf.nn.l2_normalize(net, axis=0)  # ME Preprocess the layer input
+    # # weights = tf.Variable(tf.truncated_normal([number_of_vocabulary_tokens._value, 40]), name="w_fc1")
     # net_in = tf.matmul(net, weights)
     # net = tf.nn.tanh(net_in)
     # net = tf.contrib.layers.batch_norm(net, is_training=is_training)
@@ -99,23 +115,23 @@ def FirstLayer(net, l2_reg_val, is_training):
 
     return net
 
-def l2_weighted_regularizer_(scale, x, scope=None):
-  def l2_we(weights):
-    """Applies l2 regularization to weights."""
-    with ops.name_scope(scope, 'l2_regularizer', [weights]) as name:
-      my_scale = ops.convert_to_tensor(scale,
-                                       dtype=weights.dtype.base_dtype,
-                                       name='scale')
-      return standard_ops.multiply(my_scale, nn.l2_loss(weights*), name=name)
 
-  return l2_we
 
 # ** TASK 2 ** BONUS part 1
 def EmbeddingL2RegularizationUpdate(embedding_variable, net_input, learn_rate, l2_reg_val):
     """Accepts tf.Variable, tensor (batch_size, vocab size), regularization coef.
     Returns tf op that applies one regularization step on embedding_variable."""
     # TODO(student): Change this to something useful. Currently, this is a no-op.
-    return embedding_variable.assign(embedding_variable)
+    # net_input = net_input / tf.norm(net_input)
+    net_input = tf.nn.l2_normalize(net_input, axis=0)
+    grad = 2 * l2_reg_val * tf.matmul(tf.transpose(net_input), tf.matmul(net_input, embedding_variable))
+    embedding_variable_ = embedding_variable - learn_rate * grad
+    # sigma_fnc = l2_reg_val * tf.nn.l2_loss(tf.matmul(net_input, embedding_variable))
+    # assert tf.gradients(sigma_fnc, embedding_variable) == grad, "wrong grad in L2"
+    # sess = tf.Session()
+    # print(sess.run(tf.gradients(sigma_fnc, embedding_variable),
+    #                feed_dict={net_input:numpy.random.binomial(1, .1, (3,3454))), sess.run(grad))
+    return embedding_variable.assign(embedding_variable_)
 
 
 # ** TASK 2 ** BONUS part 2
@@ -123,7 +139,11 @@ def EmbeddingL1RegularizationUpdate(embedding_variable, net_input, learn_rate, l
     """Accepts tf.Variable, tensor (batch_size, vocab size), regularization coef.
     Returns tf op that applies one regularization step on embedding_variable."""
     # TODO(student): Change this to something useful. Currently, this is a no-op.
-    return embedding_variable.assign(embedding_variable)
+    net_input = tf.nn.l2_normalize(net_input, axis=0)
+    grad = 2 * l1_reg_val * tf.matmul(tf.transpose(net_input), tf.sign(tf.matmul(net_input, embedding_variable)))
+    embedding_variable_ = embedding_variable - learn_rate * grad
+
+    return embedding_variable.assign(embedding_variable_)
 
 
 # ** TASK 3
@@ -136,6 +156,24 @@ def SparseDropout(slice_x, keep_prob=0.5):
     Returns:
       2D numpy array (batch_size, vocab_size)
     """
+    # import random
+    # slice_x = 1
+    # flat_slice_x = numpy.matrix.flatten(slice_x)
+    # idx = list(numpy.nonzero(flat_slice_x)[0])
+    # rd_idx = random.sample(idx, int((1 - keep_prob)*len(idx)))
+    # flat_slice_x[rd_idx] = 0
+    # slice_x = flat_slice_x.reshape(slice_x.shape)
+
+    # idx = numpy.nonzero(slice_x)
+    # non_zeros = slice_x[idx]
+    # len_ = len(non_zeros)
+    # idx_rd = random.sample(range(len_), int((1 - keep_prob) * len_))
+    # non_zeros[idx_rd] = 0
+    # slice_x[idx] = non_zeros
+
+    idx = numpy.nonzero(slice_x)
+    slice_x[idx] = slice_x[idx] * numpy.random.choice([0, 1], size=(len(idx[0]),), p=[1-keep_prob, keep_prob])
+
     return slice_x
 
 
@@ -339,6 +377,7 @@ def BuildInferenceNetwork(x, l2_reg_val, is_training):
     l2_reg = tf.contrib.layers.l2_regularizer(l2_reg_val)
 
     ## First Layer
+    # net = FirstLayer(net, l2_reg_val, is_training)
     net = FirstLayer(net, l2_reg_val, is_training)
 
     ## Second Layer.
