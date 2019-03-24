@@ -7,6 +7,7 @@ import numpy
 import tensorflow as tf
 import re
 import string
+from sklearn.manifold import TSNE
 
 
 
@@ -84,6 +85,10 @@ def FirstLayer(net, l2_reg_val, is_training):
     #   net, 40, activation_fn=None, weights_regularizer=l2_reg)
     # net = tf.nn.relu(net)
 
+    ## keep net for Bonus part test
+    batch_size, number_of_vocabulary_tokens = net.shape
+    net_input = tf.placeholder(tf.float32, [None, number_of_vocabulary_tokens], name='net_input')
+    net_input = 1 * net  # to make a copy
 
     ### ME
     net_norm = tf.nn.l2_normalize(net, axis=0)  # ME Preprocess the layer input
@@ -94,22 +99,14 @@ def FirstLayer(net, l2_reg_val, is_training):
     #                       kernel_regularizer=l2_weighted_regularizer_(scale=l2_reg_val, net_=net_norm), name="fc1")
     # net = tf.layers.dense(net_norm, units=40, activation=None, use_bias=False, name="fc1")
     net = tf.contrib.layers.fully_connected(net_norm, 40, activation_fn=tf.nn.tanh,
-                                            normalizer_fn=tf.contrib.layers.batch_norm, scope="fc1")  # ME If normalizer_fn is given no bias is added
+                                            normalizer_fn=None, biases_initializer=None, scope="fc1")
     y = tf.trainable_variables()[0]
-    net_in = tf.matmul(net_norm, y)
-    reg_loss_ = l2_reg_val * tf.nn.l2_loss(net_in)
+    net_inside = tf.matmul(net_norm, y)
+    reg_loss_ = l2_reg_val * tf.nn.l2_loss(net_inside)
     tf.losses.add_loss(reg_loss_, loss_collection=tf.GraphKeys.REGULARIZATION_LOSSES)
     # net = tf.nn.tanh(net)  # ME
-    # net = tf.contrib.layers.batch_norm(net,  is_training=is_training) # ME had to add it in to remove bias
+    net = tf.contrib.layers.batch_norm(net,  is_training=is_training) # ME had to add it in to remove bias
     # tf.losses.add_loss(l2_reg_val*tf.math.square(tf.norm(net*net)), loss_collection=tf.GraphKeys.REGULARIZATION_LOSSES) # Y=?
-
-    # Bonus local test
-    # batch_size, number_of_vocabulary_tokens = net.shape
-    # # net_example = tf.multinomial(tf.log([[400., 1.]]), number_of_vocabulary_tokens)
-    # # net_example = tf.constant(numpy.random.binomial(1, .1, (3,number_of_vocabulary_tokens)), dtype='int32')
-    # net_example = tf.placeholder(tf.float32, [None, number_of_vocabulary_tokens], name='x_example')
-    # var_ = tf.Variable(tf.truncated_normal([number_of_vocabulary_tokens._value, 40]), name="w_fc1")
-    # tmp = EmbeddingL2RegularizationUpdate(var_, net_example, .001, l2_reg_val)
 
     ## from scratch
     # batch_size, number_of_vocabulary_tokens = net.shape
@@ -120,6 +117,15 @@ def FirstLayer(net, l2_reg_val, is_training):
     # net = tf.contrib.layers.batch_norm(net, is_training=is_training)
     # reg_loss_ = l2_reg_val * tf.nn.l2_loss(net_in)
     # tf.losses.add_loss(reg_loss_, loss_collection=tf.GraphKeys.REGULARIZATION_LOSSES)
+
+    # Bonus local test
+    # batch_size, number_of_vocabulary_tokens = net.shape
+    # net_example = tf.multinomial(tf.log([[400., 1.]]), number_of_vocabulary_tokens)
+    # net_example = tf.constant(numpy.random.binomial(1, .1, (3,number_of_vocabulary_tokens)), dtype='int32')
+    # net_example = tf.placeholder(tf.float32, [None, number_of_vocabulary_tokens], name='x_example')
+    # var_ = tf.Variable(tf.truncated_normal([number_of_vocabulary_tokens._value, 40]), name="w_fc1")
+    tmp = EmbeddingL2RegularizationUpdate(y, net_input, .00001, l2_reg_val)
+    tmp = EmbeddingL1RegularizationUpdate(y, net_input, .00001, l2_reg_val)
 
     return net
 
@@ -134,11 +140,17 @@ def EmbeddingL2RegularizationUpdate(embedding_variable, net_input, learn_rate, l
     net_input = tf.nn.l2_normalize(net_input, axis=0)
     grad = 2 * l2_reg_val * tf.matmul(tf.transpose(net_input), tf.matmul(net_input, embedding_variable))
     embedding_variable_ = embedding_variable - learn_rate * grad
-    # sigma_fnc = l2_reg_val * tf.nn.l2_loss(tf.matmul(net_input, embedding_variable))
+
+    ## local test  #better to disable when learning
+    batch_size, number_of_vocabulary_tokens = net_input.shape
+    net_example = numpy.random.binomial(1, .1, (3, number_of_vocabulary_tokens))
+    sigma_fnc = l2_reg_val * tf.nn.l2_loss(tf.matmul(net_input, embedding_variable))
     # assert tf.gradients(sigma_fnc, embedding_variable) == grad, "wrong grad in L2"
-    # sess = tf.Session()
-    # print(sess.run(tf.gradients(sigma_fnc, embedding_variable),
-    #                feed_dict={net_input:numpy.random.binomial(1, .1, (3,3454))), sess.run(grad))
+    sess = tf.Session()
+    sess.run(tf.global_variables_initializer())
+    print(numpy.sum(sess.run(tf.gradients(sigma_fnc, embedding_variable)[0], feed_dict={net_input:net_example})
+                    - sess.run(grad, feed_dict={net_input:net_example})))
+
     return embedding_variable.assign(embedding_variable_)
 
 
@@ -148,8 +160,20 @@ def EmbeddingL1RegularizationUpdate(embedding_variable, net_input, learn_rate, l
     Returns tf op that applies one regularization step on embedding_variable."""
     # TODO(student): Change this to something useful. Currently, this is a no-op.
     net_input = tf.nn.l2_normalize(net_input, axis=0)
-    grad = 2 * l1_reg_val * tf.matmul(tf.transpose(net_input), tf.sign(tf.matmul(net_input, embedding_variable)))
+    sign_inside = tf.sign(tf.matmul(net_input, embedding_variable))
+    where = tf.equal(sign_inside, 0)  # should replace 0's with random in [-1, 1]
+    grad = 2 * l1_reg_val * tf.matmul(tf.transpose(net_input), sign_inside)
     embedding_variable_ = embedding_variable - learn_rate * grad
+
+    ## local test  #better to disable when learning
+    batch_size, number_of_vocabulary_tokens = net_input.shape
+    net_example = numpy.random.binomial(1, .1, (3, number_of_vocabulary_tokens))
+    sigma_fnc = l1_reg_val * tf.norm(tf.matmul(net_input, embedding_variable), ord=1)
+    # assert tf.gradients(sigma_fnc, embedding_variable) == grad, "wrong grad in L2"
+    sess = tf.Session()
+    sess.run(tf.global_variables_initializer())
+    print(numpy.sum(sess.run(tf.gradients(sigma_fnc, embedding_variable)[0], feed_dict={net_input: net_example})
+                    - sess.run(grad, feed_dict={net_input: net_example})))
 
     return embedding_variable.assign(embedding_variable_)
 
@@ -202,6 +226,7 @@ def ComputeTSNE(embedding_matrix):
     Returns:
       numpy array of size (vocabulary, 2)
     """
+    embedding_matrix = TSNE(n_components=2).fit_transform(embedding_matrix)
     return embedding_matrix[:, 2]
 
 
@@ -451,8 +476,10 @@ def main(argv):
     for j in range(300): step(lr / 4)
     print('Results from training:')
     evaluate()
+    VisualizeTSNE(sess)
 
 
 if __name__ == '__main__':
     # tf.random.set_random_seed(0)
+    tf.set_random_seed(0)
     main([])
