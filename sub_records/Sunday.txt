@@ -1,0 +1,30 @@
+[Executed at: Sun Mar 24 10:52:33 PDT 2019]
+
+2019-03-24 10:52:29.581419: I tensorflow/core/platform/cpu_feature_guard.cc:141] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX2 AVX512F FMA
+/usr/local/lib/python3.6/site-packages/h5py/__init__.py:36: FutureWarning: Conversion of the second argument of issubdtype from `float` to `np.floating` is deprecated. In future, it will be treated as `np.float64 == np.dtype(float).type`.
+from ._conv import register_converters as _register_converters
+
+
+Your Task 1: Tokenize implementation works well, scoring: 100%
+
+
+** You have the following failures in Task 2: FirstLayer, scoring: 65%
+- Input normalization.
+- Proper layer with tanh activation.
+
+
+** You have the following failures in Task 3: SparseDropout, scoring: 100.375%
+- Your implementation does not exactly leave keep_prob.
+
+
+** You have the following failures in Task 4: EMBEDDING_VAR Tracking, scoring: 0%
+- You are not setting EMBEDDING_VAR in BuildInferenceNetwork
+
+
+Summary:
+Task,Score,MaximumScore
+Task 1: Tokenize,10,10
+Task 2: FirstLayer,13,20
+Task 3: SparseDropout,25.0936,25
+Task 4: EMBEDDING_VAR Tracking,0,10
+Total,48.0936,65

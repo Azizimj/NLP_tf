@@ -9,6 +9,7 @@ import re
 import string
 
 
+
 def GetInputFiles():
     input_path = "F:\Acad\Spring19\CSCI544_NLP\code_hw\HW1\op_spam_training_data"
     # return glob.glob(os.path.join(sys.argv[1], '*/*/*/*.txt'))
@@ -77,13 +78,6 @@ def FirstLayer(net, l2_reg_val, is_training):
       2D tensor (batch-size, 40), where 40 is the hidden dimensionality.
     """
 
-    # batch_size, number_of_vocabulary_tokens = net.shape
-    # # net_example = tf.multinomial(tf.log([[400., 1.]]), number_of_vocabulary_tokens)
-    # # net_example = tf.constant(numpy.random.binomial(1, .1, (3,number_of_vocabulary_tokens)), dtype='int32')
-    # net_example = tf.placeholder(tf.float32, [None, number_of_vocabulary_tokens], name='x_example')
-    # var_ = tf.Variable(tf.truncated_normal([number_of_vocabulary_tokens._value, 40]), name="w_fc1")
-    # tmp = EmbeddingL2RegularizationUpdate(var_, net_example, .001, l2_reg_val)
-
     # Intact
     # l2_reg = tf.contrib.layers.l2_regularizer(l2_reg_val)
     # net = tf.contrib.layers.fully_connected(
@@ -92,16 +86,30 @@ def FirstLayer(net, l2_reg_val, is_training):
 
 
     ### ME
-    net = tf.nn.l2_normalize(net, axis=0)  # ME Preprocess the layer input
+    net_norm = tf.nn.l2_normalize(net, axis=0)  # ME Preprocess the layer input
     # net = tf.contrib.layers.fully_connected(net, 40, activation_fn=tf.nn.tanh,
     #                                         weights_regularizer=l2_weighted_regularizer_(scale=l2_reg_val, net_=net),
     #                                         normalizer_fn=tf.contrib.layers.batch_norm, scope="fc1")  # ME If normalizer_fn is given no bias is added
-    net = tf.layers.dense(net, units=40, activation=None, use_bias=False,
-                          kernel_regularizer=l2_weighted_regularizer_(scale=l2_reg_val, net_=net), name="fc1")
-    net = tf.nn.tanh(net)  # ME
-    net = tf.contrib.layers.batch_norm(net,  is_training=is_training) # ME had to add it in to remove bias
+    # net = tf.layers.dense(net_norm, units=40, activation=None, use_bias=False,
+    #                       kernel_regularizer=l2_weighted_regularizer_(scale=l2_reg_val, net_=net_norm), name="fc1")
+    # net = tf.layers.dense(net_norm, units=40, activation=None, use_bias=False, name="fc1")
+    net = tf.contrib.layers.fully_connected(net_norm, 40, activation_fn=tf.nn.tanh,
+                                            normalizer_fn=tf.contrib.layers.batch_norm, scope="fc1")  # ME If normalizer_fn is given no bias is added
+    y = tf.trainable_variables()[0]
+    net_in = tf.matmul(net_norm, y)
+    reg_loss_ = l2_reg_val * tf.nn.l2_loss(net_in)
+    tf.losses.add_loss(reg_loss_, loss_collection=tf.GraphKeys.REGULARIZATION_LOSSES)
+    # net = tf.nn.tanh(net)  # ME
+    # net = tf.contrib.layers.batch_norm(net,  is_training=is_training) # ME had to add it in to remove bias
     # tf.losses.add_loss(l2_reg_val*tf.math.square(tf.norm(net*net)), loss_collection=tf.GraphKeys.REGULARIZATION_LOSSES) # Y=?
 
+    # Bonus local test
+    # batch_size, number_of_vocabulary_tokens = net.shape
+    # # net_example = tf.multinomial(tf.log([[400., 1.]]), number_of_vocabulary_tokens)
+    # # net_example = tf.constant(numpy.random.binomial(1, .1, (3,number_of_vocabulary_tokens)), dtype='int32')
+    # net_example = tf.placeholder(tf.float32, [None, number_of_vocabulary_tokens], name='x_example')
+    # var_ = tf.Variable(tf.truncated_normal([number_of_vocabulary_tokens._value, 40]), name="w_fc1")
+    # tmp = EmbeddingL2RegularizationUpdate(var_, net_example, .001, l2_reg_val)
 
     ## from scratch
     # batch_size, number_of_vocabulary_tokens = net.shape
@@ -379,6 +387,8 @@ def BuildInferenceNetwork(x, l2_reg_val, is_training):
     ## First Layer
     # net = FirstLayer(net, l2_reg_val, is_training)
     net = FirstLayer(net, l2_reg_val, is_training)
+
+    EMBEDDING_VAR = tf.trainable_variables()[0]
 
     ## Second Layer.
     net = tf.contrib.layers.fully_connected(
