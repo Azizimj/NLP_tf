@@ -67,7 +67,6 @@ def l2_weighted_regularizer_(scale, net_):
   return l2_we
 
 # ** TASK 2.
-# def FirstLayer(net, l2_reg_val, is_training):
 def FirstLayer(net, l2_reg_val, is_training):
     """First layer of the neural network.
 
@@ -107,6 +106,7 @@ def FirstLayer(net, l2_reg_val, is_training):
     tf.losses.add_loss(reg_loss_, loss_collection=tf.GraphKeys.REGULARIZATION_LOSSES)
     # net = tf.nn.tanh(net)  # ME
     net = tf.contrib.layers.batch_norm(net,  is_training=is_training) # ME
+    # net = tf.layers.batch_normalization(net, training=is_training)
     # tf.losses.add_loss(l2_reg_val*tf.math.square(tf.norm(net*net)), loss_collection=tf.GraphKeys.REGULARIZATION_LOSSES) # Y=?
 
     ## from scratch
@@ -139,7 +139,7 @@ def EmbeddingL2RegularizationUpdate(embedding_variable, net_input, learn_rate, l
     # TODO(student): Change this to something useful. Currently, this is a no-op.
     # net_input = net_input / tf.norm(net_input)
     net_input = tf.nn.l2_normalize(net_input, axis=0)
-    grad = 2 * l2_reg_val * tf.matmul(tf.transpose(net_input), tf.matmul(net_input, embedding_variable))
+    grad = l2_reg_val * tf.matmul(tf.transpose(net_input), tf.matmul(net_input, embedding_variable))
     embedding_variable_ = embedding_variable - learn_rate * grad
 
     ## local test  #better to disable when learning
@@ -151,8 +151,8 @@ def EmbeddingL2RegularizationUpdate(embedding_variable, net_input, learn_rate, l
     sess.run(tf.global_variables_initializer())
     tf_grad = sess.run(tf.gradients(sigma_fnc, embedding_variable)[0], feed_dict={net_input: net_example})
     my_grad = sess.run(grad, feed_dict={net_input: net_example})
-    differ = numpy.sum(tf_grad - my_grad)
-    differ = differ / numpy.sum(tf_grad)
+    differ = numpy.linalg.norm(tf_grad - my_grad)
+    differ = differ / numpy.linalg.norm(tf_grad)
     print('l2 grad differentage {}'.format(differ))
 
     return embedding_variable.assign(embedding_variable_)
@@ -165,8 +165,9 @@ def EmbeddingL1RegularizationUpdate(embedding_variable, net_input, learn_rate, l
     # TODO(student): Change this to something useful. Currently, this is a no-op.
     net_input = tf.nn.l2_normalize(net_input, axis=0)
     sign_inside = tf.sign(tf.matmul(net_input, embedding_variable))
-    where = tf.equal(sign_inside, 0)  # should replace 0's with random in [-1, 1]
-    grad = 2 * l1_reg_val * tf.matmul(tf.transpose(net_input), sign_inside)
+    where = tf.equal(sign_inside, 0)
+    # should replace 0's with random in [-1, 1] for an better (not necessarily acute)implementation
+    grad = l1_reg_val * tf.matmul(tf.transpose(net_input), sign_inside)
     embedding_variable_ = embedding_variable - learn_rate * grad
 
     ## local test  #better to disable when learning
@@ -178,9 +179,9 @@ def EmbeddingL1RegularizationUpdate(embedding_variable, net_input, learn_rate, l
     sess.run(tf.global_variables_initializer())
     tf_grad = sess.run(tf.gradients(sigma_fnc, embedding_variable)[0], feed_dict={net_input: net_example})
     my_grad = sess.run(grad, feed_dict={net_input: net_example})
-    differ = numpy.sum(tf_grad - my_grad)
-    differ = differ / numpy.sum(tf_grad)
-    print('l2 grad differentage {}'.format(differ))
+    differ = numpy.linalg.norm(tf_grad - my_grad)
+    differ = differ / numpy.linalg.norm(tf_grad)
+    print('l1 grad differentage {}'.format(differ))
 
     return embedding_variable.assign(embedding_variable_)
 
@@ -244,8 +245,9 @@ def ComputeTSNE(embedding_matrix):
     Returns:
       numpy array of size (vocabulary, 2)
     """
-    embedding_matrix = TSNE(n_components=2, n_iter=250,perplexity=5, n_iter_without_progress=10,
-                            min_grad_norm=1e-2 ).fit_transform(embedding_matrix)
+    # embedding_matrix = TSNE(n_components=2, n_iter=250,perplexity=5, n_iter_without_progress=10,
+    #                         min_grad_norm=1e-2 ).fit_transform(embedding_matrix)
+    embedding_matrix = TSNE(n_components=2).fit_transform(embedding_matrix)
     # return embedding_matrix[:, 2]
     return embedding_matrix
 
@@ -286,6 +288,7 @@ def VisualizeTSNE(sess):
     # TODO(student): Visualize scatter plot of tsne_embeddings, showing only words
     # listed in class_to_words. Words under the same class must be visualized with
     # the same color. Plot both the word text and the tSNE coordinates.
+    print('visualization should generate now')
 
     # vocab_words = numpy.array([k for k,v in TERM_INDEX.items()])
     class_to_words_idx = {}
@@ -299,14 +302,19 @@ def VisualizeTSNE(sess):
     class_colors = {'positive': 'blue', 'negative': 'Orange', 'furniture': 'red', 'location': 'green'}
 
     fig, ax = plt.subplots()
+    scale = 1
     for class_ in class_to_words.keys():
-        x_ = class_pts[class_][0, :]
-        y_ = class_pts[class_][1,:]
-        words_ = class_to_words[class_]
-        plt.scatter(x_, y_, marker='o', color=class_colors[class_])
-        plt.text(x_ + .03, y_ + .03, words_, fontsize=9)
-
-    print('visualization should generate now')
+        for i, _ in enumerate(class_pts[class_]):
+            x_ = class_pts[class_][i, 0]*scale
+            y_ = class_pts[class_][i, 1]*scale
+            word_ = class_to_words[class_][i]
+            plt.scatter(x_, y_, marker='o', color=class_colors[class_])
+            plt.text(x_ + .05, y_ + .05, word_, fontsize=9)
+            plt.text(x_ - .1, y_ - .1, "(" + str(round(x_, 2)) + ', ' + str(round(y_, 2)) + ")", fontsize=9)
+    plt.title("coordinates are multiplied by {}".format(scale))
+    plt.show()
+    plt.savefig("tsne_embeds_saved.pdf")
+    plt.close()
 
 
 CACHE = {}
@@ -350,7 +358,8 @@ def MakeDesignMatrix(x):
             if term not in TERM_INDEX:
                 continue
             j = TERM_INDEX[term]
-            x_matrix[i, j] = count  # 1.0  # Try count or log(1+count)
+            x_matrix[i, j] = numpy.log(1+count)  # 1.0  # Try count or log(1+count)
+            # F1 mean; 1:.8415, count: .8419, log(1+count):.8430
     return x_matrix
 
 
@@ -511,12 +520,12 @@ def main(argv):
 
     lr = 0.05
     print('Training model ... ')
-    # for j in range(300): step(lr)
-    # for j in range(300): step(lr / 2)
-    # for j in range(300): step(lr / 4)
-    for j in range(30): step(lr)
-    print('Results from training:')
+    for j in range(300): step(lr)
+    for j in range(300): step(lr / 2)
+    for j in range(300): step(lr / 4)
+    # for j in range(30): step(lr)
     VisualizeTSNE(sess)
+    print('Results from training:')
     evaluate()
 
 
