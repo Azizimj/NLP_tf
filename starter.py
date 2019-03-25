@@ -8,6 +8,7 @@ import tensorflow as tf
 import re
 import string
 from sklearn.manifold import TSNE
+import matplotlib.pyplot as plt
 
 
 
@@ -105,7 +106,7 @@ def FirstLayer(net, l2_reg_val, is_training):
     reg_loss_ = l2_reg_val * tf.nn.l2_loss(net_inside)
     tf.losses.add_loss(reg_loss_, loss_collection=tf.GraphKeys.REGULARIZATION_LOSSES)
     # net = tf.nn.tanh(net)  # ME
-    net = tf.contrib.layers.batch_norm(net,  is_training=is_training) # ME had to add it in to remove bias
+    net = tf.contrib.layers.batch_norm(net,  is_training=is_training) # ME
     # tf.losses.add_loss(l2_reg_val*tf.math.square(tf.norm(net*net)), loss_collection=tf.GraphKeys.REGULARIZATION_LOSSES) # Y=?
 
     ## from scratch
@@ -124,8 +125,8 @@ def FirstLayer(net, l2_reg_val, is_training):
     # net_example = tf.constant(numpy.random.binomial(1, .1, (3,number_of_vocabulary_tokens)), dtype='int32')
     # net_example = tf.placeholder(tf.float32, [None, number_of_vocabulary_tokens], name='x_example')
     # var_ = tf.Variable(tf.truncated_normal([number_of_vocabulary_tokens._value, 40]), name="w_fc1")
-    tmp = EmbeddingL2RegularizationUpdate(y, net_input, .00001, l2_reg_val)
-    tmp = EmbeddingL1RegularizationUpdate(y, net_input, .00001, l2_reg_val)
+    tmp = EmbeddingL2RegularizationUpdate(y, net_input, .005, l2_reg_val)
+    tmp = EmbeddingL1RegularizationUpdate(y, net_input, .005, l2_reg_val)
 
     return net
 
@@ -148,8 +149,11 @@ def EmbeddingL2RegularizationUpdate(embedding_variable, net_input, learn_rate, l
     # assert tf.gradients(sigma_fnc, embedding_variable) == grad, "wrong grad in L2"
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())
-    print(numpy.sum(sess.run(tf.gradients(sigma_fnc, embedding_variable)[0], feed_dict={net_input:net_example})
-                    - sess.run(grad, feed_dict={net_input:net_example})))
+    tf_grad = sess.run(tf.gradients(sigma_fnc, embedding_variable)[0], feed_dict={net_input: net_example})
+    my_grad = sess.run(grad, feed_dict={net_input: net_example})
+    differ = numpy.sum(tf_grad - my_grad)
+    differ = differ / numpy.sum(tf_grad)
+    print('l2 grad differentage {}'.format(differ))
 
     return embedding_variable.assign(embedding_variable_)
 
@@ -172,8 +176,11 @@ def EmbeddingL1RegularizationUpdate(embedding_variable, net_input, learn_rate, l
     # assert tf.gradients(sigma_fnc, embedding_variable) == grad, "wrong grad in L2"
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())
-    print(numpy.sum(sess.run(tf.gradients(sigma_fnc, embedding_variable)[0], feed_dict={net_input: net_example})
-                    - sess.run(grad, feed_dict={net_input: net_example})))
+    tf_grad = sess.run(tf.gradients(sigma_fnc, embedding_variable)[0], feed_dict={net_input: net_example})
+    my_grad = sess.run(grad, feed_dict={net_input: net_example})
+    differ = numpy.sum(tf_grad - my_grad)
+    differ = differ / numpy.sum(tf_grad)
+    print('l2 grad differentage {}'.format(differ))
 
     return embedding_variable.assign(embedding_variable_)
 
@@ -202,9 +209,20 @@ def SparseDropout(slice_x, keep_prob=0.5):
     # idx_rd = random.sample(range(len_), int((1 - keep_prob) * len_))
     # non_zeros[idx_rd] = 0
     # slice_x[idx] = non_zeros
+    # slice_x_copy = numpy.copy(slice_x)
+    # idx = numpy.nonzero(slice_x)
+    # slice_x[idx] = slice_x[idx] * numpy.random.choice([0, 1], size=(len(idx[0]),), p=[1-keep_prob, keep_prob])
 
+    # this gives the exact proportion
     idx = numpy.nonzero(slice_x)
-    slice_x[idx] = slice_x[idx] * numpy.random.choice([0, 1], size=(len(idx[0]),), p=[1-keep_prob, keep_prob])
+    len_idx = len(idx[0])
+    arr = numpy.zeros(len_idx)
+    arr[:int(len_idx*keep_prob)] = 1
+    numpy.random.shuffle(arr)
+    slice_x[idx] *= arr
+    # check
+    # assert len(numpy.nonzero(slice_x[idx])[0]) == len(slice_x[idx]) * keep_prob , 'Dropout; not right proportion'
+
 
     return slice_x
 
@@ -226,8 +244,10 @@ def ComputeTSNE(embedding_matrix):
     Returns:
       numpy array of size (vocabulary, 2)
     """
-    embedding_matrix = TSNE(n_components=2).fit_transform(embedding_matrix)
-    return embedding_matrix[:, 2]
+    embedding_matrix = TSNE(n_components=2, n_iter=250,perplexity=5, n_iter_without_progress=10,
+                            min_grad_norm=1e-2 ).fit_transform(embedding_matrix)
+    # return embedding_matrix[:, 2]
+    return embedding_matrix
 
 
 # ** TASK 5
@@ -266,6 +286,26 @@ def VisualizeTSNE(sess):
     # TODO(student): Visualize scatter plot of tsne_embeddings, showing only words
     # listed in class_to_words. Words under the same class must be visualized with
     # the same color. Plot both the word text and the tSNE coordinates.
+
+    # vocab_words = numpy.array([k for k,v in TERM_INDEX.items()])
+    class_to_words_idx = {}
+    class_pts = {}
+    # class_words_words = {}
+    for class_ in class_to_words.keys():
+        # class_to_words_idx[class_] = {word:index for word,index in TERM_INDEX.items() if word in class_to_words[class_]}
+        class_to_words_idx[class_] = [TERM_INDEX[word] for word in class_to_words[class_]]
+        class_pts[class_] = tsne_embeddings[class_to_words_idx[class_], :]
+        # class_words_words[class_] = list(class_to_words_idx[class_].keys()) # the words in class_to_words does not work since order changes in the finding step
+    class_colors = {'positive': 'blue', 'negative': 'Orange', 'furniture': 'red', 'location': 'green'}
+
+    fig, ax = plt.subplots()
+    for class_ in class_to_words.keys():
+        x_ = class_pts[class_][0, :]
+        y_ = class_pts[class_][1,:]
+        words_ = class_to_words[class_]
+        plt.scatter(x_, y_, marker='o', color=class_colors[class_])
+        plt.text(x_ + .03, y_ + .03, words_, fontsize=9)
+
     print('visualization should generate now')
 
 
@@ -471,12 +511,14 @@ def main(argv):
 
     lr = 0.05
     print('Training model ... ')
-    for j in range(300): step(lr)
-    for j in range(300): step(lr / 2)
-    for j in range(300): step(lr / 4)
+    # for j in range(300): step(lr)
+    # for j in range(300): step(lr / 2)
+    # for j in range(300): step(lr / 4)
+    for j in range(30): step(lr)
     print('Results from training:')
-    evaluate()
     VisualizeTSNE(sess)
+    evaluate()
+
 
 
 if __name__ == '__main__':
