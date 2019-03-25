@@ -309,10 +309,10 @@ def VisualizeTSNE(sess):
             y_ = class_pts[class_][i, 1]*scale
             word_ = class_to_words[class_][i]
             plt.scatter(x_, y_, marker='o', color=class_colors[class_])
-            plt.text(x_ + .05, y_ + .05, word_, fontsize=9)
-            plt.text(x_ - .1, y_ - .1, "(" + str(round(x_, 2)) + ', ' + str(round(y_, 2)) + ")", fontsize=9)
+            plt.text(x_, y_ + .2, word_, fontsize=6)
+            plt.text(x_, y_ - .2, "(" + str(round(x_, 2)) + ', ' + str(round(y_, 2)) + ")", fontsize=6)
     plt.title("coordinates are multiplied by {}".format(scale))
-    plt.show()
+    # plt.show()
     plt.savefig("tsne_embeds_saved.pdf")
     plt.close()
 
