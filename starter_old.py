@@ -81,6 +81,16 @@ def FirstLayer(net, l2_reg_val, is_training):
       2D tensor (batch-size, 40), where 40 is the hidden dimensionality.
     """
 
+    # Intact
+    # global VARS
+    # l2_reg = tf.contrib.layers.l2_regularizer(l2_reg_val)
+    # VARS['1'] = net
+    # net = tf.contrib.layers.fully_connected(
+    #   net, 40, activation_fn=None, weights_regularizer=l2_reg)
+    # VARS['2'] = net
+    # net = tf.nn.relu(net)
+    # VARS['3'] = net  # etc
+
     ## keep net for Bonus part test
     batch_size, number_of_vocabulary_tokens = net.shape
     net_input = tf.placeholder(tf.float32, [None, number_of_vocabulary_tokens], name='net_input')
@@ -88,13 +98,40 @@ def FirstLayer(net, l2_reg_val, is_training):
 
     ### ME
     net_norm = tf.nn.l2_normalize(net, axis=0)  # ME Preprocess the layer input
+    # net = tf.contrib.layers.fully_connected(net, 40, activation_fn=tf.nn.tanh,
+    #                                         weights_regularizer=l2_weighted_regularizer_(scale=l2_reg_val, net_=net),
+    #                                         normalizer_fn=tf.contrib.layers.batch_norm, scope="fc1")  # ME If normalizer_fn is given no bias is added
+    # net = tf.layers.dense(net_norm, units=40, activation=None, use_bias=False,
+    #                       kernel_regularizer=l2_weighted_regularizer_(scale=l2_reg_val, net_=net_norm), name="fc1")
+    # net = tf.layers.dense(net_norm, units=40, activation=None, use_bias=False, name="fc1")
     net = tf.contrib.layers.fully_connected(net_norm, 40, activation_fn=None,
                                             normalizer_fn=None, biases_initializer=None, scope="fc1")
     y = tf.trainable_variables()[0]
+    # net_inside = tf.matmul(net_norm, y)
+    # reg_loss_ = l2_reg_val * tf.nn.l2_loss(net_inside)
+    # tf.losses.add_loss(reg_loss_, loss_collection=tf.GraphKeys.REGULARIZATION_LOSSES)
     tf.losses.add_loss(l2_reg_val * tf.nn.l2_loss(net), loss_collection=tf.GraphKeys.REGULARIZATION_LOSSES)
     net = tf.nn.tanh(net)  # ME
     net = tf.contrib.layers.batch_norm(net,  is_training=is_training) # ME
+    # net = tf.layers.batch_normalization(net, training=is_training)
+    # tf.losses.add_loss(l2_reg_val*tf.math.square(tf.norm(net*net)), loss_collection=tf.GraphKeys.REGULARIZATION_LOSSES) # Y=?
 
+    ## from scratch
+    # batch_size, number_of_vocabulary_tokens = net.shape
+    # net = tf.nn.l2_normalize(net, axis=0)  # ME Preprocess the layer input
+    # # weights = tf.Variable(tf.truncated_normal([number_of_vocabulary_tokens._value, 40]), name="w_fc1")
+    # net_in = tf.matmul(net, weights)
+    # net = tf.nn.tanh(net_in)
+    # net = tf.contrib.layers.batch_norm(net, is_training=is_training)
+    # reg_loss_ = l2_reg_val * tf.nn.l2_loss(net_in)
+    # tf.losses.add_loss(reg_loss_, loss_collection=tf.GraphKeys.REGULARIZATION_LOSSES)
+
+    # Bonus local test
+    # batch_size, number_of_vocabulary_tokens = net.shape
+    # net_example = tf.multinomial(tf.log([[400., 1.]]), number_of_vocabulary_tokens)
+    # net_example = tf.constant(numpy.random.binomial(1, .1, (3,number_of_vocabulary_tokens)), dtype='int32')
+    # net_example = tf.placeholder(tf.float32, [None, number_of_vocabulary_tokens], name='x_example')
+    # var_ = tf.Variable(tf.truncated_normal([number_of_vocabulary_tokens._value, 40]), name="w_fc1")
     tmp = EmbeddingL2RegularizationUpdate(y, net_input, .005, l2_reg_val)
     tmp = EmbeddingL1RegularizationUpdate(y, net_input, .005, l2_reg_val)
 
@@ -121,9 +158,9 @@ def EmbeddingL2RegularizationUpdate(embedding_variable, net_input, learn_rate, l
     sess.run(tf.global_variables_initializer())
     tf_grad = sess.run(tf.gradients(sigma_fnc, embedding_variable)[0], feed_dict={net_input: net_example})
     my_grad = sess.run(grad, feed_dict={net_input: net_example})
-    # differ = numpy.linalg.norm(tf_grad - my_grad)
-    # differ = differ / numpy.linalg.norm(tf_grad)
-    # print('l2 grad differentage {}'.format(differ))
+    differ = numpy.linalg.norm(tf_grad - my_grad)
+    differ = differ / numpy.linalg.norm(tf_grad)
+    print('l2 grad differentage {}'.format(differ))
     print('l2 grad max difference {}'.format(numpy.max(tf_grad - my_grad)))
 
     return embedding_variable.assign(embedding_variable_)
@@ -150,9 +187,9 @@ def EmbeddingL1RegularizationUpdate(embedding_variable, net_input, learn_rate, l
     sess.run(tf.global_variables_initializer())
     tf_grad = sess.run(tf.gradients(sigma_fnc, embedding_variable)[0], feed_dict={net_input: net_example})
     my_grad = sess.run(grad, feed_dict={net_input: net_example})
-    # differ = numpy.linalg.norm(tf_grad - my_grad)
-    # differ = differ / numpy.linalg.norm(tf_grad)
-    # print('l1 grad differentage {}'.format(differ))
+    differ = numpy.linalg.norm(tf_grad - my_grad)
+    differ = differ / numpy.linalg.norm(tf_grad)
+    print('l1 grad differentage {}'.format(differ))
     print('l2 grad max difference {}'.format(numpy.max(tf_grad - my_grad)))
 
     return embedding_variable.assign(embedding_variable_)
