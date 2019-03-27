@@ -338,7 +338,7 @@ def MakeDesignMatrix(x):
             if term not in TERM_INDEX:
                 continue
             j = TERM_INDEX[term]
-            x_matrix[i, j] = numpy.log(1+count)  # 1.0  # Try count or log(1+count)
+            x_matrix[i, j] = numpy.log(1+count)  # 1.0  # Try count or log(1+count) numpy.log(1+count)
             # F1 mean; 1:.8415, count: .8419, log(1+count):.8430
     return x_matrix
 
