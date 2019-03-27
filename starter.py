@@ -116,14 +116,14 @@ def EmbeddingL2RegularizationUpdate(embedding_variable, net_input, learn_rate, l
     Returns tf op that applies one regularization step on embedding_variable."""
     # TODO(student): Change this to something useful. Currently, this is a no-op.
     # net_input = net_input / tf.norm(net_input)
-    net_input = tf.nn.l2_normalize(net_input, axis=0)
-    grad = l2_reg_val * tf.matmul(tf.transpose(net_input), tf.matmul(net_input, embedding_variable))
+    net_input = tf.nn.l2_normalize(net_input, axis=1)
+    grad = 2* l2_reg_val * tf.matmul(tf.transpose(net_input), tf.matmul(net_input, embedding_variable))
     embedding_variable_ = embedding_variable - learn_rate * grad
 
     ## local test  #better to disable when learning
     batch_size, number_of_vocabulary_tokens = net_input.shape
     net_example = numpy.random.binomial(1, .1, (3, number_of_vocabulary_tokens))
-    sigma_fnc = l2_reg_val * tf.nn.l2_loss(tf.matmul(net_input, embedding_variable))
+    sigma_fnc = 2* l2_reg_val * tf.nn.l2_loss(tf.matmul(net_input, embedding_variable))
     # assert tf.gradients(sigma_fnc, embedding_variable) == grad, "wrong grad in L2"
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())
@@ -142,7 +142,7 @@ def EmbeddingL1RegularizationUpdate(embedding_variable, net_input, learn_rate, l
     """Accepts tf.Variable, tensor (batch_size, vocab size), regularization coef.
     Returns tf op that applies one regularization step on embedding_variable."""
     # TODO(student): Change this to something useful. Currently, this is a no-op.
-    net_input = tf.nn.l2_normalize(net_input, axis=0)
+    net_input = tf.nn.l2_normalize(net_input, axis=1)
     sign_inside = tf.sign(tf.matmul(net_input, embedding_variable))
     where = tf.equal(sign_inside, 0)
     # should replace 0's with random in [-1, 1] for an better (not necessarily acute)implementation
