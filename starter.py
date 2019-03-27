@@ -66,7 +66,7 @@ def l2_weighted_regularizer_(scale, net_):
     return scale*tf.nn.l2_loss(tf.matmul(net_, weights))
   return l2_we
 
-# VARS = {}
+VARS = {}
 
 # ** TASK 2.
 def FirstLayer(net, l2_reg_val, is_training):
@@ -87,16 +87,24 @@ def FirstLayer(net, l2_reg_val, is_training):
     net_input = 1 * net  # to make a copy
 
     ### ME
-    net_norm = tf.nn.l2_normalize(net, axis=0)  # ME Preprocess the layer input
+    global VARS
+    VARS['net'] = net
+    net_norm = tf.nn.l2_normalize(net, axis=1)  # ME Preprocess the layer input
+    VARS['net_norm'] = net_norm
     net = tf.contrib.layers.fully_connected(net_norm, 40, activation_fn=None,
                                             normalizer_fn=None, biases_initializer=None, scope="fc1")
-    y = tf.trainable_variables()[0]
+    VARS['net_norm_y'] = net
+    Y = tf.trainable_variables()[0]
     tf.losses.add_loss(l2_reg_val * tf.nn.l2_loss(net), loss_collection=tf.GraphKeys.REGULARIZATION_LOSSES)
-    net = tf.nn.tanh(net)  # ME
+    VARS['net_loss'] = net
     net = tf.contrib.layers.batch_norm(net,  is_training=is_training) # ME
+    VARS['net_batchnorm'] = net
+    net = tf.nn.tanh(net)  # ME
+    VARS['net_tanh'] = net
 
-    tmp = EmbeddingL2RegularizationUpdate(y, net_input, .005, l2_reg_val)
-    tmp = EmbeddingL1RegularizationUpdate(y, net_input, .005, l2_reg_val)
+    tmp = EmbeddingL2RegularizationUpdate(Y, net_input, .005, l2_reg_val)
+    tmp = EmbeddingL1RegularizationUpdate(Y, net_input, .005, l2_reg_val)
+    VARS['net_bonus'] = net
 
     return net
 
@@ -472,8 +480,8 @@ def main(argv):
     sess.run(tf.global_variables_initializer())
 
     # Debuging
-    # global VARS
-    # import IPython
+    global VARS
+    import IPython
     # IPython.embed()
     # Debuging
 
@@ -487,6 +495,8 @@ def main(argv):
             y: batch_y,
             is_training: True, learning_rate: lr,
         })
+        a = 1
+        # sess.run(VARS, {x:batch_x, y:batch_y, learning_rate:lr, is_training:True})
 
     def step(lr=0.01, batch_size=100):
         indices = numpy.random.permutation(x_train.shape[0])
@@ -499,6 +509,7 @@ def main(argv):
     lr = 0.05
     print('Training model ... ')
     for j in range(300): step(lr)
+    # IPython.embed()
     for j in range(300): step(lr / 2)
     for j in range(300): step(lr / 4)
     # for j in range(30): step(lr)
