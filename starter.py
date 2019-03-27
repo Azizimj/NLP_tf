@@ -89,9 +89,9 @@ def FirstLayer(net, l2_reg_val, is_training):
     ### ME
     global VARS
     VARS['net'] = net
-    net_norm = tf.nn.l2_normalize(net, axis=1)  # ME Preprocess the layer input
-    VARS['net_norm'] = net_norm
-    net = tf.contrib.layers.fully_connected(net_norm, 40, activation_fn=None,
+    net = tf.nn.l2_normalize(net, axis=1)  # ME Preprocess the layer input
+    VARS['net_norm'] = net
+    net = tf.contrib.layers.fully_connected(net, 40, activation_fn=None,
                                             normalizer_fn=None, biases_initializer=None, scope="fc1")
     VARS['net_norm_y'] = net
     Y = tf.trainable_variables()[0]
@@ -495,7 +495,7 @@ def main(argv):
             y: batch_y,
             is_training: True, learning_rate: lr,
         })
-        a = 1
+        # a = 1
         # sess.run(VARS, {x:batch_x, y:batch_y, learning_rate:lr, is_training:True})
 
     def step(lr=0.01, batch_size=100):
